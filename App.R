@@ -2,12 +2,10 @@ library(shiny)
 library(readxl)
 library(data.table)
 library(ggplot2)
-library(tidyverse)
-library(devtools)
-library(ggpubr)
+library(lubridate)
 library(shinydashboard)
 
-trm = read_excel("D:/DATOS/Documents/Documentos personales/Proceso Sura/1.1.1.TCM_Serie historica IQY.xlsx")
+trm = read_excel("1.1.1.TCM_Serie historica IQY.xlsx")
 trm = setDT(trm)
 names(trm)[1] = "Fecha"
 names(trm)[2] = "TRM"
@@ -20,7 +18,7 @@ trm_1[, Ano_Mes := paste(Ano, Mes, 1, sep = "-")]
 trm_1 = trm_1[,Ano_Mes := as.Date(Ano_Mes, format = c("%Y-%m-%d"))]
 trm_1 = trm_1[order(Fecha)]
 
-petroleo = read.csv("D:/DATOS/Documents/Documentos personales/Proceso Sura/Datos historicos Futuros petroleo Brent.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
+petroleo = read.csv("Datos historicos Futuros petroleo Brent.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
 colnames(petroleo)
 names(petroleo)[1] = "Fecha"
 names(petroleo)[2] = "Cierre"
@@ -122,18 +120,16 @@ trm_pet = trm_pet[Fecha >= "2010-01-01"]
 
 cor.test(trm_pet$TRM, trm_pet$Cierre, method = "pearson")
 
-ggscatter(trm_pet, x = "TRM", y = "Cierre", 
-          add = "reg.line", conf.int = TRUE, 
-          cor.coef = TRUE, cor.method = "pearson",
-          xlab = "TRM", ylab = "Cierre")
+ggplot(data=trm_pet, 
+       aes(x = trm_pet$TRM, y = trm_pet$Cierre)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE) +
+  labs(y = "Petroleo", x = "TRM") + labs(title = "Grafico de Dispersion")
 
 trm_pet = setDT(trm_pet)
 
 shapiro.test(trm_pet[, ln_TRM := log(trm_pet$TRM)]$ln_TRM )
 shapiro.test(trm_pet$Cierre) 
-
-ggqqplot(trm_pet[, ln_TRM := log(trm_pet$TRM)]$ln_TRM, ylab = "TRM")
-ggqqplot(trm_pet$Cierre, ylab = "Cierre")
 
 min_TRM = trm_1[, lapply(.SD,min),, by = Ano][,.(Ano, TRM)]
 setnames(min_TRM, "TRM", "min_TRM")
@@ -149,11 +145,11 @@ min_max_trm = merge(min_TRM, max_TRM)
 resumen_TRM = merge(min_max_trm, mean_TRM)
 resumen_TRM
 
-AAPL = read.csv("D:/DATOS/Documents/Documentos personales/Proceso Sura/Datos historicos AAPL.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
-AMZN = read.csv("D:/DATOS/Documents/Documentos personales/Proceso Sura/Datos historicos AMZN.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
-FB = read.csv("D:/DATOS/Documents/Documentos personales/Proceso Sura/Datos historicos FB.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
-GOOG = read.csv("D:/DATOS/Documents/Documentos personales/Proceso Sura/Datos historicos GOOG.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
-MSFT = read.csv("D:/DATOS/Documents/Documentos personales/Proceso Sura/Datos historicos MSFT.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
+AAPL = read.csv("Datos historicos AAPL.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
+AMZN = read.csv("Datos historicos AMZN.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
+FB = read.csv("Datos historicos FB.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
+GOOG = read.csv("Datos historicos GOOG.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
+MSFT = read.csv("Datos historicos MSFT.csv", header = TRUE, sep = ",", dec = ".", stringsAsFactors = FALSE)
 
 ###' Se crea funcion con el mismo preprocesamiento utilizado para cargar la informacion del petroleo en la Parte 1.
 
@@ -198,24 +194,11 @@ ui <- fluidPage(
   
   # App title ----
   titlePanel("Analisis de Precios"),
-  
-  # Sidebar layout with input and output definitions ----
-  #sidebarLayout(
-    
-    # Sidebar panel for inputs ----
-    #sidebarPanel(
-      
-      # Input: Select the random distribution type ----
-     # tags$div(class="header", checked=NA,
-     #          tags$h3("Historicos de Precios")
-    #  )
-      
-    #),
     
     # Main panel for displaying outputs ----
     mainPanel(
       
-      # Output: Tabset w/ plot, summary, and table ----
+      # Output: 
       tabsetPanel(type = "tabs",
                   
                   tabPanel("TRM vs. Petroleo", 
@@ -245,6 +228,16 @@ ui <- fluidPage(
                            
                            ),
                   
+                  tabPanel("Summary", 
+                           
+                           tags$div(class="header", checked=NA,
+                                    tags$h4("Tabla Resumen TRM")
+                           ),
+                           
+                           tableOutput("summary")
+                           
+                           ),
+                  
                   tabPanel("S&P500", 
                            
                            # Sidebar panel for inputs ----
@@ -255,36 +248,23 @@ ui <- fluidPage(
                                             "Amazon" = "AMZN",
                                             "Facebook" = "FB",
                                             "Google" = "GOOG",
-                                            "Microsoft" = "MSFT")),
-                             
-                             # br() element to introduce extra vertical spacing ----
-                             br()
+                                            "Microsoft" = "MSFT"))
                              
                            ),
                              
                            plotOutput("acciones")
                       
-                           ),
+                           )
                   
-                  tabPanel("Summary", verbatimTextOutput("summary"))
       )
       
     )
  # )
 )
 
-# Define server logic for random distribution app ----
+# Define server logic
 server <- function(input, output) {
   
-  # Reactive expression to generate the requested distribution ----
-  # This is called whenever the inputs change. The output functions
-  # defined below then use the value computed from this expression
-
-  # Generate a plot of the data ----
-  # Also uses the inputs to build the plot label. Note that the
-  # dependencies on the inputs and the data reactive expression are
-  # both tracked, and all expressions are called in the sequence
-  # implied by the dependency graph.
   output$TRMD <- renderPlot({
     ggplot(data=trm_1, aes(x=trm_1$Fecha, 
                            y=trm_1$TRM)) +
@@ -338,23 +318,24 @@ server <- function(input, output) {
   })
   
   output$cor_test <- renderValueBox({
-    valueBox(cor(trm_pet$TRM, trm_pet$Cierre, method = "pearson"), 
-             "Coeficiente de Correlacion")
+    valueBox(cor(trm_pet$TRM, trm_pet$Cierre, method = "spearman"), 
+             "Coeficiente de Correlacion de Spearman")
   })
   
   output$Corr <- renderPlot({
-    ggscatter(trm_pet, x = "TRM", y = "Cierre", 
-              add = "reg.line", conf.int = TRUE, 
-              cor.coef = TRUE, cor.method = "pearson",
-              xlab = "TRM", ylab = "Cierre")
+    ggplot(data=trm_pet, 
+           aes(x = trm_pet$TRM, y = trm_pet$Cierre)) +
+    geom_point() +
+    geom_smooth(method=lm, se=FALSE) +
+    labs(y = "Petroleo", x = "TRM") + labs(title = "Grafico de Dispersion")
   })
   
-  # Generate a summary of the data ----
-  output$summary <- renderPrint({
-    summary(d())
+  # Generate a summary of the data
+  output$summary <- renderTable({
+    resumen_TRM
   })
   
-  # Generate an HTML table view of the data ----
+  # Generate an Sidebar Panel information
   output$acciones <- renderPlot({
     if (input$Accion == "AAPL") {
       line_precios(AAPL)
